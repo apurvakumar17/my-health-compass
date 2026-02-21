@@ -1,0 +1,4 @@
+project_id = "jexzjlorwwedfyzfpsiv"
+
+[functions.health-advice]
+verify_jwt = false
