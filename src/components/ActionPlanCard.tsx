@@ -1,4 +1,5 @@
 import { Loader2, Sparkles } from "lucide-react";
+import ReactMarkdown from 'react-markdown';
 
 interface ActionPlanCardProps {
   advice: string | null;
@@ -29,7 +30,7 @@ const ActionPlanCard = ({ advice, loading, error }: ActionPlanCardProps) => {
 
       {advice && !loading && (
         <div className="text-sm text-card-foreground leading-relaxed whitespace-pre-line">
-          {advice}
+          <ReactMarkdown>{advice}</ReactMarkdown>
         </div>
       )}
     </div>
