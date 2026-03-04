@@ -27,9 +27,9 @@ const QuestionCard = ({ index, question, domain, value, onChange }: QuestionCard
         </span>
         <div className="flex-1">
           <p className="font-medium text-card-foreground leading-snug">{question}</p>
-          <span className="inline-block mt-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
+          {/* <span className="inline-block mt-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
             {domain}
-          </span>
+          </span> */}
         </div>
       </div>
 
