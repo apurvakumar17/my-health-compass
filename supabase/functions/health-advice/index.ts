@@ -12,15 +12,36 @@ serve(async (req) => {
   }
 
   try {
-    const { weakDomains, scores } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const body = await req.json();
+    const { weakDomains, scores, selectedOption, scoreCategory, totalScore } = body;
 
-    const domainList = weakDomains.join(", ");
-    // const systemPrompt = `You are a friendly, evidence-based health coach. You give short, practical, and encouraging advice. Use bullet points and keep it under 200 words. Do not use markdown headers. Use emoji sparingly for warmth.`;
-    // const userPrompt = `The user completed a Health-Promoting Lifestyle assessment. Their weak areas (scored "Never") are: ${domainList}. Their full scores: ${JSON.stringify(scores)}. Give a short, actionable daily routine focusing on improving these weak areas. Be specific and encouraging.`;
+    let systemPrompt = "";
+    let userPrompt = "";
 
-    const systemPrompt = `
+    if (selectedOption) {
+      systemPrompt = `
+You are an intelligent Health Behaviour Agent providing structured follow-up advice.
+The user scored in the "${scoreCategory}" category (Total Score: ${totalScore}).
+They have chosen to focus on: "${selectedOption}".
+
+Depending on their category, adopt the appropriate intervention style:
+- Poor: Provide a structured 7-day corrective plan, daily reminders, micro-habit formation, and strong nudging.
+- Moderate: Provide an optimization plan, weekly goal setting, and behavior tracking.
+- Good: Focus on performance optimization, habit stacking, and reward reinforcement.
+- Excellent: Focus on gamification, leadership-based engagement (like mentoring), and advanced goal setting.
+
+Communication Style:
+- Professional, encouraging, and highly specific to their chosen focus area.
+- Use bullet points.
+- Maximum 200 words.
+- No markdown headers.
+- Use emoji sparingly.
+`;
+
+      userPrompt = `Please provide the customized follow-up guidance for the category "${scoreCategory}" focusing specifically on "${selectedOption}".`;
+    } else {
+      const domainList = weakDomains.join(", ");
+      systemPrompt = `
 You are an intelligent Health Behaviour Agent that analyzes a user's lifestyle questionnaire and provides personalized wellness guidance.
 
 Questionnaire details:
@@ -87,7 +108,7 @@ Communication Style:
 - Use emoji sparingly
 `;
 
-    const userPrompt = `
+      userPrompt = `
 A user completed a Health Behaviour questionnaire.
 
 Weak domains detected:
@@ -118,19 +139,23 @@ Depending on the category:
 
 Keep the response practical and encouraging.
 `;
+    }
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
+
     const response = await fetch(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
+      "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Authorization": `Bearer ${GEMINI_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
+          model: "gemini-2.5-flash",
           messages: [
             { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
+            { role: "user", content: userPrompt }
           ],
           stream: false,
         }),
@@ -144,16 +169,10 @@ Keep the response practical and encouraging.
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI credits exhausted. Please add credits." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
       const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
+      console.error("Gemini API error:", response.status, t);
       return new Response(
-        JSON.stringify({ error: "Failed to get AI recommendations" }),
+        JSON.stringify({ error: `Gemini API Error: ${response.status} - ${t}` }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

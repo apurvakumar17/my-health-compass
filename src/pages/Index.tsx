@@ -25,12 +25,61 @@ function getCategory(score: number) {
   return "Excellent";
 }
 
+const getQuizContent = (score: number) => {
+  if (score < 13) {
+    return {
+      text: "Your responses indicate that your current health behavior pattern needs immediate attention. Would you like support in improving through:",
+      options: [
+        "Food and nutrition changes",
+        "Lifestyle restructuring",
+        "Stress and mental wellness support",
+        "Physical activity plan",
+        "Professional guidance"
+      ]
+    };
+  } else if (score <= 19) {
+    return {
+      text: "You are maintaining your health moderately well. Some areas can be strengthened. Which direction would you prefer to improve?",
+      options: [
+        "Improve energy & routine",
+        "Strengthen mental balance",
+        "Enhance physical activity",
+        "Improve social & preventive habits"
+      ]
+    };
+  } else if (score <= 25) {
+    return {
+      text: "You are doing well. Would you like to further optimize or maintain your performance?",
+      options: [
+        "Performance enhancement",
+        "Advanced fitness tracking",
+        "Productivity & focus enhancement",
+        "Preventive health mastery"
+      ]
+    };
+  } else {
+    return {
+      text: "Excellent! You show strong health responsibility. Would you like to:",
+      options: [
+        "Maintain current level",
+        "Mentor others",
+        "Take advanced wellness challenges",
+        "Track long-term performance analytics"
+      ]
+    };
+  }
+};
+
 const Index = () => {
   const [answers, setAnswers] = useState<(number | null)[]>(Array(8).fill(null));
   const [submitted, setSubmitted] = useState(false);
   const [advice, setAdvice] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [followUpAdvice, setFollowUpAdvice] = useState<string | null>(null);
+  const [aiFollowUpLoading, setAiFollowUpLoading] = useState(false);
+  const [followUpError, setFollowUpError] = useState<string | null>(null);
 
   const handleChange = (index: number, value: number) => {
     setAnswers((prev) => {
@@ -88,12 +137,44 @@ const Index = () => {
     }
   };
 
+  const handleFollowUpSubmit = async () => {
+    if (!selectedOption) return;
+
+    setAiFollowUpLoading(true);
+    setFollowUpError(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("health-advice", {
+        body: {
+          selectedOption,
+          scoreCategory: category,
+          totalScore
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setFollowUpAdvice(data.advice);
+    } catch (err: any) {
+      console.error("AI follow-up error:", err);
+      setFollowUpError("Could not generate follow-up guidance. Please try again.");
+      toast.error("Failed to generate follow-up guidance");
+    } finally {
+      setAiFollowUpLoading(false);
+    }
+  };
+
   const handleReset = () => {
     setAnswers(Array(8).fill(null));
     setSubmitted(false);
     setAdvice(null);
     setAiError(null);
     setAiLoading(false);
+    setSelectedOption(null);
+    setFollowUpAdvice(null);
+    setAiFollowUpLoading(false);
+    setFollowUpError(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -149,10 +230,46 @@ const Index = () => {
 
             <ActionPlanCard advice={advice} loading={aiLoading} error={aiError} />
 
+            {/* Follow-up Quiz Section */}
+            {advice && !aiLoading && !aiError && (
+              <div className="rounded-lg border border-border bg-card p-6 sm:p-8 text-left animate-fade-in-up mt-6">
+                <p className="font-medium text-card-foreground mb-4">
+                  {getQuizContent(totalScore).text}
+                </p>
+                <div className="space-y-3 mb-6">
+                  {getQuizContent(totalScore).options.map((option, idx) => (
+                    <label
+                      key={idx}
+                      className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors ${selectedOption === option ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"}`}
+                    >
+                      <input
+                        type="radio"
+                        name="followUpOption"
+                        value={option}
+                        checked={selectedOption === option}
+                        onChange={(e) => setSelectedOption(e.target.value)}
+                        className="mt-1"
+                      />
+                      <span className="text-sm">{option}</span>
+                    </label>
+                  ))}
+                </div>
+                <Button
+                  onClick={handleFollowUpSubmit}
+                  disabled={!selectedOption || aiFollowUpLoading}
+                  className="w-full h-11"
+                >
+                  {aiFollowUpLoading ? "Generating Guidance..." : "Get Further Guidance"}
+                </Button>
+              </div>
+            )}
+
+            <ActionPlanCard advice={followUpAdvice} loading={aiFollowUpLoading} error={followUpError} />
+
             <Button
               onClick={handleReset}
               variant="outline"
-              className="w-full h-11 gap-2"
+              className="w-full h-11 gap-2 mt-4"
             >
               <RotateCcw className="w-4 h-4" />
               Retake Assessment
